@@ -11,7 +11,7 @@ COLOUR_BOUNDS = [
     [(0, 187, 125)  , (39, 255, 255)  , "RED"    , 2 , (128,0,128)], # Adjusted to include desired RED
     [(10, 70, 70)  , (25, 255, 60)  , "ORANGE" , 3 , (0,128,255)],
     [(30, 170, 100), (40, 250, 255)  , "YELLOW" , 4 , (0,255,255)],
-    [(35, 20, 110) , (60, 45, 120)   , "GREEN"  , 5 , (0,255,0)],
+    [(30, 76, 89) , (87, 255, 184)   , "GREEN"  , 5 , (0,255,0)],
     [(65, 0, 85)   , (115, 30, 147)  , "BLUE"   , 6 , (255,0,0)],
     [(120, 40, 100), (140, 250, 220) , "PURPLE" , 7 , (255,0,127)],
     [(0, 0, 50)    , (179, 50, 80)   , "GRAY"   , 8 , (128,128,128)],
@@ -40,46 +40,48 @@ def init(DEBUG):
     return rectCascade
 
 def printResult(color_code_positions, liveimg, resPos):
-    # Sort the dictionary by x-coordinate (key) and extract the codes and coordinates
-    sorted_positions = sorted(color_code_positions.items())
-    resistor_value = ""
-    detected_colors = []
 
     color_names = {0: "BLACK", 1: "BROWN", 2: "RED", 3: "ORANGE", 4: "YELLOW",
                    5: "GREEN", 6: "BLUE", 7: "PURPLE", 8: "GRAY", 9: "WHITE"}
-
-    for pos in sorted_positions:
-        color_code = pos[1][0]
-        coordinates = pos[1][1]
-        resistor_value += str(color_code)
-        detected_colors.append(f"{color_names[color_code]} at {coordinates}")
-
+    
+    # Sort the dictionary by x-coordinate (key) and extract the codes
+    sorted_positions = sorted(color_code_positions.items())
+    color_codes = [pos[1][0] for pos in sorted_positions]  # List of color codes in order of appearance
+    detected_colors = [f"{color_names[code]} at {pos[1][1]}" for code, pos in zip(color_codes, sorted_positions)]
     detected_colors_str = "; ".join(detected_colors)
     print(f"Detected Colors: {detected_colors_str}")
 
-    display_message = "Cannot calculate value"
-    if len(resistor_value) > 1:
-        base_value = int(resistor_value[:-1])
-        multiplier = 10 ** int(resistor_value[-1])
+    # Base value and multiplier extraction based on the number of bands
+    if len(color_codes) >= 3:
+        if len(color_codes) == 3:
+            base_value = int(f"{color_codes[0]}{color_codes[1]}")
+            multiplier = 10 ** color_codes[2]
+        elif len(color_codes) == 4 or len(color_codes) == 5 or len(color_codes) == 6:
+            base_value = int(f"{color_codes[0]}{color_codes[1]}{color_codes[2]}"[:3])  # Ensures only the first three are digits
+            multiplier = 10 ** color_codes[3]
+
         final_resistance = base_value * multiplier
         display_message = f"{final_resistance} OHMS"
         print(f"Resistor Value: {final_resistance} Ohms")
     else:
         display_message = "Insufficient data to calculate resistance."
 
+    # Display results
     x, y, w, h = resPos
     cv2.rectangle(liveimg, (x, y), (x + w, y + h), (0, 255, 0), 2)
     cv2.putText(liveimg, display_message, (x + w + 10, y), FONT, 1, (255, 255, 255), 2, cv2.LINE_AA)
 
     # Optionally display all detected colors as well
-    text_y = y + 20  # Start a bit below the top of the rectangle
+    text_y = y + 20
     for color_text in detected_colors:
         cv2.putText(liveimg, color_text, (x, text_y), FONT, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
-        text_y += 20  # Move text down for the next color
+        text_y += 20
 
     if DEBUG:
         # Show the final image with annotations in debug mode
         cv2.imshow("Final Result", liveimg)
+
+
 
 
 def validContour(cnt):
@@ -151,7 +153,7 @@ def findBands(resistorInfo, DEBUG):
 # MAIN
 rectCascade = init(DEBUG)
 
-cliveimg = cv2.imread("IMG_1509.jpg")
+cliveimg = cv2.imread("IMG_1506.jpeg")
 cliveimg = cv2.resize(cliveimg, (0,0), fx=0.2, fy=0.2) 
 
 resClose = findResistors(cliveimg, rectCascade)
