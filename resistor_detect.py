@@ -153,7 +153,7 @@ def findBands(resistorInfo, DEBUG):
 # MAIN
 rectCascade = init(DEBUG)
 
-cliveimg = cv2.imread("IMG_1506.jpeg")
+cliveimg = cv2.imread("pic1.jpg")
 cliveimg = cv2.resize(cliveimg, (0,0), fx=0.2, fy=0.2) 
 
 resClose = findResistors(cliveimg, rectCascade)
