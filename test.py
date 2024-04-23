@@ -1,11 +1,13 @@
 import cv2
 import numpy as np
 
+clr = [(22, 103, 164), (35, 255, 255)  , "YELLOW" , 4 , (0,255,255)] #adjusted
+
 def nothing(x):
     pass
 
 # Load an image
-image_path = 'IMG_1506.jpeg'  # Update this to the path of your image
+image_path = 'pic3.jpg'  # Update this to the path of your image
 img = cv2.imread(image_path)
 img = cv2.resize(img, (0,0), fx=0.1, fy=0.1) 
 if img is None:
@@ -38,7 +40,9 @@ else:
 
         cv2.imshow('Original', img)
         cv2.imshow('Mask', mask)
-        cv2.imshow('Result', result)
+        cv2.imshow('Result', result)    
+        cv2.imshow("HSV Image", hsv)
+
 
         if cv2.waitKey(1) & 0xFF == 27:  # Press 'esc' to close
             break
