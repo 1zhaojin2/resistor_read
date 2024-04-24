@@ -19,8 +19,8 @@ def show_region_and_all_matched_areas(event, x, y, flags, param):
         floodflags |= cv2.FLOODFILL_FIXED_RANGE | cv2.FLOODFILL_MASK_ONLY
 
         # Define the color range threshold for flood filling
-        loDiff = (20, 20, 20, 20)
-        upDiff = (20, 20, 20, 20)
+        loDiff = (25, 25, 25, 25)
+        upDiff = (25, 25, 25, 25)
 
         # Perform flood fill from point (x, y)
         cv2.floodFill(img_copy, mask, (x, y), 0, loDiff, upDiff, floodflags)
