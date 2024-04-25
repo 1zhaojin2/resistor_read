@@ -19,8 +19,8 @@ def show_region_and_all_matched_areas(event, x, y, flags, param):
         floodflags |= cv2.FLOODFILL_FIXED_RANGE | cv2.FLOODFILL_MASK_ONLY
 
         # Define the color range threshold for flood filling
-        loDiff = (25, 25, 25, 25)
-        upDiff = (25, 25, 25, 25)
+        loDiff = (30, 30, 30, 30)
+        upDiff = (30, 30, 30, 30)
 
         # Perform flood fill from point (x, y)
         cv2.floodFill(img_copy, mask, (x, y), 0, loDiff, upDiff, floodflags)
@@ -58,8 +58,8 @@ def show_region_and_all_matched_areas(event, x, y, flags, param):
         cv2.imshow("Statistics", stats_img)
 
 # Load an image
-image = cv2.imread('pic4.png')
-image = cv2.resize(image, (0,0), fx=0.3, fy=0.3)
+image = cv2.imread('average_img.jpg')
+# image = cv2.resize(image, (0,0), fx=0.3, fy=0.3)
 
 # Check if image is loaded properly
 if image is None:

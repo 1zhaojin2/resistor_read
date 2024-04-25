@@ -7,7 +7,7 @@ def nothing(x):
     pass
 
 # Load an image
-image_path = 'pic4.png'  # Update this to the path of your image
+image_path = '0.jpg'  # Update this to the path of your image
 img = cv2.imread(image_path)
 img = cv2.resize(img, (0,0), fx=0.3, fy=0.3)
 if img is None:

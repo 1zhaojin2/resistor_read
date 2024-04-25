@@ -1,204 +1,162 @@
+"""
+Image Cropping and Resizing:
+    Once the Haar Cascade has identified the resistor's location, crop this area from the original image to focus solely
+     on the resistor.
+    Resize the cropped image to a standard size to normalize the processing regardless of the original size. This helps
+     in consistent color band segmentation.
+Image Preprocessing:
+    Convert the cropped image to a grayscale image to help in thresholding and edge detection, which can further assist
+     in isolating the color bands from the body of the resistor.
+    Apply filters, such as a Gaussian Blur, to smooth out the image, reducing noise and enhancing the detection of the
+     edges of the color bands.
+Segmentation of Color Bands:
+    Use edge detection techniques (like the Sobel filter or Canny edge detector) to find vertical boundaries of color
+     bands. This will help in segmenting the image into distinct color bands.
+    You might also consider using morphological operations like dilation and erosion to clarify the separation between
+     bands.
+Color Recognition:
+    For each segmented color band, extract the dominant color. This can be done by converting the color space to HSV and
+     calculating the histogram to find the most frequent hue values.
+    Map these dominant hue values to the closest standard resistor color codes.
+Avoiding Background/Body Color:
+    To ensure the machine does not count the background or body color of the resistor, you can set thresholds based on
+     the color distribution. Typically, the body of the resistor (often tan or blue) can be distinct from the vibrant
+     colors used for the bands.
+    Analyze only those segments that fall within the expected size range of a color band compared to the overall length
+     of the resistor, excluding any large areas that extend beyond typical band dimensions.
+Validation and Calibration:
+    Validate the system with known resistors under various lighting conditions to calibrate your color detection
+     algorithms.
+    Adjust thresholds and algorithms based on this testing to improve accuracy and robustness.
+"""
+
 import cv2
 import numpy as np
-import os
-import imutils
+import math
 
-band_areas = []  # List to hold area of each detected band
-DEBUG = True
+band_areas = []
+
 COLOUR_BOUNDS = [
-    [(0, 0, 0), (179, 255, 40), "BLACK", 0, (255, 255, 0)],
-    [(0, 68, 48), (117, 255, 97), "BROWN", 1, (0, 255, 102)],  # adjusted
-    [(0, 187, 125), (39, 255, 255), "RED", 2, (128, 0, 128)],
-    [(6, 197, 87), (20, 255, 255), "ORANGE", 3, (0, 128, 255)],  # adjusted
-    [(22, 103, 164), (35, 255, 255), "YELLOW", 4, (0, 255, 255)],  # adjusted
-    [(30, 76, 89), (87, 255, 184), "GREEN", 5, (0, 255, 0)],
-    [(113, 40, 82), (125, 255, 255), "BLUE", 6, (255, 0, 0)],  # adjusted
-    [(130, 40, 100), (140, 250, 220), "PURPLE", 7, (255, 0, 127)],  # adjusted
-    [(0, 0, 50), (179, 50, 80), "GRAY", 8, (128, 128, 128)],
-    [(0, 0, 0), (0, 0, 0), "WHITE", 9, (255, 255, 255)],  # ignoring white for now lol
-    [(19, 120, 80), (23, 255, 255), "GOLD", 10, (0, 215, 255)],  # Approximate for Gold
-    [(0, 0, 0), (0, 0, 50), "SILVER", 11, (192, 192, 192)]  # Very light gray, almost white
+    [(0, 0, 0)     , (179, 255, 40)   , "BLACK"  , 0 , (255,255,0)],
+    [(0, 68, 48)   , (117, 255, 97)  , "BROWN"  , 1 , (0,255,102)], #adjusted
+    [(0, 187, 125)  , (39, 255, 255)  , "RED"    , 2 , (128,0,128)],
+    [(6, 197, 87)  , (20, 255, 255)  , "ORANGE" , 3 , (0,128,255)], #adjusted
+    [(22, 103, 164), (35, 255, 255)  , "YELLOW" , 4 , (0,255,255)], #adjusted
+    [(30, 76, 89) , (87, 255, 184)   , "GREEN"  , 5 , (0,255,0)],
+    [(113, 40, 82)   , (125, 255, 255)  , "BLUE"   , 6 , (255,0,0)], #adjusted
+    [(130, 40, 100), (140, 250, 220) , "PURPLE" , 7 , (255,0,127)], #adjusted
+    [(0, 0, 50)    , (179, 50, 80)   , "GRAY"   , 8 , (128,128,128)],
+    [(0, 0, 0)    , (0, 0, 0)  , "WHITE"  , 9 , (255,255,255)], #ignoring white for now lol
+    [(19, 120, 80), (23, 255, 255), "GOLD", 10, (0,215,255)],  # Approximate for Gold
+    [(0, 0, 0), (0, 0, 50), "SILVER", 11, (192,192,192)]  # Very light gray, almost white
     # reminder to self - add white color
 ]
 
-tolerance_codes = {
-    10: "5%",  # Gold
-    11: "10%"  # Silver
-}
 
-RED_TOP_LOWER = (160, 30, 80)
-RED_TOP_UPPER = (179, 255, 200)
-FONT = cv2.FONT_HERSHEY_SIMPLEX
+def load_and_detect_resistors(image_path):
+    img = cv2.imread(image_path)
+    if img is None:
+        print("Error: Image not found")
+        return None, None
 
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    cascade = cv2.CascadeClassifier('cascade/haarcascade_resistors_0.xml')
+    resistors = cascade.detectMultiScale(gray, scaleFactor=1.2, minNeighbors=7)  # Adjusted parameters
 
-def empty(x):
-    pass
+    # Filter detections by size (example sizes, adjust accordingly)
+    min_width, min_height = 100, 50  # Minimum acceptable dimensions for a resistor
+    filtered_resistors = [r for r in resistors if r[2] >= min_width and r[3] >= min_height]
 
-
-def init(DEBUG):
-    if (DEBUG):
-        cv2.namedWindow("frame")
-        cv2.createTrackbar("lh", "frame", 0, 179, empty)
-        cv2.createTrackbar("uh", "frame", 0, 179, empty)
-        cv2.createTrackbar("ls", "frame", 0, 255, empty)
-        cv2.createTrackbar("us", "frame", 0, 255, empty)
-        cv2.createTrackbar("lv", "frame", 0, 255, empty)
-        cv2.createTrackbar("uv", "frame", 0, 255, empty)
-    tPath = os.getcwd()
-    rectCascade = cv2.CascadeClassifier(tPath + "/cascade/haarcascade_resistors_0.xml")
-    return rectCascade
+    return img, filtered_resistors
 
 
-def printResult(color_code_positions, liveimg, resPos):
-    color_names = {
-        0: "BLACK",
-        1: "BROWN",
-        2: "RED",
-        3: "ORANGE",
-        4: "YELLOW",
-        5: "GREEN",
-        6: "BLUE",
-        7: "PURPLE",
-        8: "GRAY",
-        9: "WHITE",
-        10: "GOLD",
-        11: "SILVER"  # Make sure these new entries are present
-    }
 
-    temperature_list = {
-        0: "250 ppm/K",
-        1: "100 ppm/K",
-        2: "50 ppm/K",
-        3: "15 ppm/K",
-        4: "25 ppm/K",
-        5: "20 ppm/K",
-        6: "10 ppm/K",
-        7: "5 ppm/K",
-        8: "1 ppm/K"
-    }
+def crop_resistor(img, x, y, w, h):
+    # Calculate the vertical middle point of the resistor
+    mid_y = y + h // 2
 
-    # Sort the dictionary by x-coordinate (key) and extract the codes
-    sorted_positions = sorted(color_code_positions.items())
-    color_codes = [pos[1][0] for pos in sorted_positions]  # List of color codes in order of appearance
-    detected_colors = [f"{color_names[code]} at {pos[1][1]}" for code, pos in zip(color_codes, sorted_positions)]
-    detected_colors_str = "; ".join(detected_colors)
-    print(f"Detected Colors: {detected_colors_str}")
+    # Adjust the x coordinate to start 50 pixels more to the right
+    # and reduce the width by 100 pixels (50 from each side)
+    start_x = x + 110
+    end_x = x + w - 110
 
-    # Base value and multiplier extraction based on the number of bands
-    if len(color_codes) >= 3:
-        if len(color_codes) == 3:
-            base_value = int(str(color_codes[0]) + str(color_codes[1]))
-            multiplier = 10 ** color_codes[2]
-        elif len(color_codes) == 4:
-            base_value = int(str(color_codes[0]) + str(color_codes[1]))
-            multiplier = 10 ** color_codes[2]
-            if tolerance_codes.get(color_codes[3]):
-                tolerance = tolerance_codes[color_codes[3]]
-            print(f"Tolerance: {tolerance}")
-        elif len(color_codes) == 5:
-            base_value = int(str(color_codes[0]) + str(color_codes[1]) + str(color_codes[2]))
-            multiplier = 10 ** color_codes[3]
-            if tolerance_codes.get(color_codes[4]):
-                tolerance = tolerance_codes[color_codes[4]]
-            print(f"Tolerance: {tolerance}")
-        elif len(color_codes) == 6:
-            base_value = int(str(color_codes[0]) + str(color_codes[1]) + str(color_codes[2]))
-            multiplier = 10 ** color_codes[3]
-            if tolerance_codes.get(color_codes[4]):
-                tolerance = tolerance_codes[color_codes[4]]
-            temperature = color_codes[5]
-            temperature = temperature_list[temperature]
-            print(f"Tolerance: {tolerance}")
-            print(f"Temperature: {temperature}")
+    # Ensure the new x coordinates are not out of image bounds
+    start_x = max(start_x, 0)
+    end_x = min(end_x, img.shape[1])
 
-        final_resistance = base_value * multiplier
-        display_message = f"{final_resistance} OHMS"
-        print(f"Resistor Value: {final_resistance} Ohms")
-    else:
-        display_message = "Insufficient data to calculate resistance."
+    # Define the crop region for y coordinate
+    start_y = max(mid_y , 0)
+    end_y = min(mid_y + 20, img.shape[0])
 
-    # Display results
-    x, y, w, h = resPos
-    cv2.rectangle(liveimg, (x, y), (x + w, y + h), (0, 255, 0), 2)
-    cv2.putText(liveimg, display_message, (x + w + 10, y), FONT, 1, (255, 255, 255), 2, cv2.LINE_AA)
+    # Crop the image around the middle of the resistor
+    return img[start_y:end_y, start_x:end_x]
 
-    # Optionally display all detected colors as well
-    text_y = y + 20
-    for color_text in detected_colors:
-        cv2.putText(liveimg, color_text, (x, text_y), FONT, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
-        text_y += 20
+def compute_vertical_averages(cropped_img):
+    # Compute the average of each column (axis=0) for all color channels
+    vertical_averages = np.mean(cropped_img, axis=0)
 
-    if DEBUG:
-        # Show the final image with annotations in debug mode
-        cv2.imshow("Final Result", liveimg)
+    # Normalize the averages to span the full range of colors
+    vertical_averages = cv2.normalize(vertical_averages, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX)
+    vertical_averages = np.array(vertical_averages, dtype=np.uint8)
+
+    # Create an image to display the averages
+    # The height is 20 pixels, and we replicate the averages array 20 times vertically
+    average_img = np.tile(vertical_averages, (20, 1, 1))
+
+    return average_img
 
 
-def validContour(cnt):
-    # Check if the contour area is at least 150 square pixels
-    if cv2.contourArea(cnt) < 150:
-        return False
-    else:
-        x, y, w, h = cv2.boundingRect(cnt)
-    return True
+# Include this in your main code where appropriate to test the flood fill
+# Draw the results on your cropped_img to see how well the flood fill is working
 
 
-def findResistors(liveimg, rectCascade):
-    gliveimg = cv2.cvtColor(liveimg, cv2.COLOR_BGR2GRAY)
-    resClose = []
-    ressFind = rectCascade.detectMultiScale(gliveimg, 1.1, 25)
-    for (x, y, w, h) in ressFind:
-        roi_gray = gliveimg[y:y + h, x:x + w]
-        roi_color = liveimg[y:y + h, x:x + w]
-        secondPass = rectCascade.detectMultiScale(roi_gray, 1.01, 5)
-        if (len(secondPass) != 0):
-            # Check for bands within this roi before adding
-            temp_img = np.copy(roi_color)
-            temp_resized_img = cv2.resize(temp_img, (400, 200))
-            color_bands = findBands((temp_resized_img, None), DEBUG)
-            if color_bands:  # Only append if there are detected color bands
-                resClose.append((roi_color, (x, y, w, h)))
-    return resClose
+def preprocess_image(cropped_img):
+    hsv_img = cv2.cvtColor(cropped_img, cv2.COLOR_BGR2HSV)
+
+    h, s, v = cv2.split(hsv_img)
+
+    highlight_threshold = 180
+
+    v[v > highlight_threshold] = highlight_threshold
+
+    processed_hsv_img = cv2.merge([h, s, v])
+
+    highlight_removed_img = cv2.cvtColor(processed_hsv_img, cv2.COLOR_HSV2BGR)
+
+    return highlight_removed_img
 
 
-def findBands(resistorInfo, DEBUG):
-    resImg = cv2.resize(resistorInfo[0], (400, 200))
-    midY = resImg.shape[0] // 2
-    midX = resImg.shape[1] // 2
 
-    # Pre-processing for mask detection
-    # crop the middle 20 pixels vertically and 150 pixels horizontally
-    roi = resImg[midY + 1: midY + 20, midX - 100: midX + 100]
-    pre_bil = cv2.bilateralFilter(roi, 5, 80, 80)
-    hsv = cv2.cvtColor(pre_bil, cv2.COLOR_BGR2HSV)
-    thresh = cv2.adaptiveThreshold(cv2.cvtColor(pre_bil, cv2.COLOR_BGR2GRAY), 255, cv2.ADAPTIVE_THRESH_MEAN_C,
-                                   cv2.THRESH_BINARY, 59, 5)
-    thresh = cv2.bitwise_not(thresh)
-
-    color_code_positions = {}
-    last_accepted_position = -30
-
-    # display cropped image
-    if DEBUG:
-        cv2.imshow("Cropped Image", resImg)
-        cv2.imshow("Preprocessed Image", pre_bil)
-        cv2.imshow("Thresholded Image", thresh)
+def display_images(images, titles):
+    for img, title in zip(images, titles):
+        cv2.imshow(title, img)
 
 
-# MAIN
-rectCascade = init(DEBUG)
+def main(image_path):
+    img, resistors = load_and_detect_resistors(image_path)
+    if img is None or resistors is None:
+        return
 
-cliveimg = cv2.imread("pic4.jpg")
-if cliveimg is None:
-    print("Image not found. Please check the file path.")
-else:
-    cliveimg = cv2.resize(cliveimg, (0, 0), fx=0.2, fy=0.2)
+    # Draw bounding boxes around detected resistors
+    for (x, y, w, h) in resistors:
+        cv2.rectangle(img, (x, y), (x + w, y + h), (255, 0, 0), 2)  # Draw red rectangles
 
-    resClose = findResistors(cliveimg, rectCascade)
-    for res in resClose:
-        color_code_positions = findBands(res, DEBUG)
-        if color_code_positions:  # Check again to ensure there are detected bands
-            printResult(color_code_positions, cliveimg, res[1])
+    processed_images = []
+    for (x, y, w, h) in resistors:
+        cropped_img = crop_resistor(img, x, y, w, h)
+        preprocessed_img = preprocess_image(cropped_img)
 
-    cv2.imshow("Frame", cliveimg)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+        processed_images.append((cropped_img, 'Cropped Resistor'))
+        processed_images.append((preprocessed_img, 'Preprocessed Image with Edges'))
+        average_img = compute_vertical_averages(preprocessed_img)
+        processed_images.append((average_img, 'Vertical Average Profile'))
+
+    # Display all cropped, preprocessed images, and vertical averages
+    display_images(*zip(*processed_images))
+
+
+# Run the main function with the specified image
+main('pic4.jpg')
+cv2.waitKey()
+cv2.destroyAllWindows()
+
