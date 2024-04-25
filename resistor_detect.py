@@ -99,8 +99,9 @@ def printResult(color_code_positions, liveimg, resPos):
         elif len(color_codes) == 5:
             base_value = int(str(color_codes[0]) + str(color_codes[1]) + str(color_codes[2]))
             multiplier = 10 ** color_codes[3]
-            if tolerance_codes.get(color_codes[4]):
-                tolerance = tolerance_codes[color_codes[4]]
+            tolerance = color_codes[4]
+            if tolerance_codes.get(tolerance):
+                tolerance = tolerance_codes[tolerance]
             print(f"Tolerance: {tolerance}")
         elif len(color_codes) == 6:
             base_value = int(str(color_codes[0]) + str(color_codes[1]) + str(color_codes[2]))
@@ -135,11 +136,31 @@ def printResult(color_code_positions, liveimg, resPos):
 
 def validContour(cnt):
     # Check if the contour area is at least 150 square pixels
-    if cv2.contourArea(cnt) < 150:
+    if cv2.contourArea(cnt) < 130:
         return False
     else:
         x, y, w, h = cv2.boundingRect(cnt)
     return True
+
+def compute_vertical_medians(cropped_img):
+    # Initialize an array to hold the median values for each column
+    median_values = np.zeros((1, cropped_img.shape[1], 3), dtype=np.uint8)  # Assuming the image is in color
+
+    # Iterate over each column to calculate the median
+    for i in range(cropped_img.shape[1]):
+        # Extract the column across all rows for each channel
+        column = cropped_img[:, i, :]
+        
+        # Calculate the median for each color channel
+        median_values[0, i, 0] = np.median(column[:, 0])  # B channel
+        median_values[0, i, 1] = np.median(column[:, 1])  # G channel
+        median_values[0, i, 2] = np.median(column[:, 2])  # R channel
+
+    # Create an image to display the medians
+    # Repeat the median values array vertically to make it visible as an image strip
+    median_img = np.tile(median_values, (20, 1, 1))  # Extend vertically to make a visible strip
+
+    return median_img
 
 def findResistors(liveimg, rectCascade):
     gliveimg = cv2.cvtColor(liveimg, cv2.COLOR_BGR2GRAY)
@@ -215,7 +236,7 @@ def findBands(resistorInfo, DEBUG):
 # MAIN
 rectCascade = init(DEBUG)
 
-cliveimg = cv2.imread("pic3.jpg")
+cliveimg = cv2.imread("pic4.jpg")
 if cliveimg is None:
     print("Image not found. Please check the file path.")
 else:
