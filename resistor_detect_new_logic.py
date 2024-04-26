@@ -21,6 +21,15 @@ COLOUR_BOUNDS = [
     [(0, 0, 0), (0, 0, 50), "SILVER", 11, (192, 192, 192)]
 ]
 tolerance_codes = {
+    1: "±1%",  # Brown
+    2: "±2%",  # Red
+    3: "±0.05",  # Orange
+    4: "±0.02",  # Yellow
+    5: "±0.5%",  # Green
+    6: "±0.25%",  # Blue
+    7: "±0.1%",  # Purple
+    8: "±0.01",  # Gray
+
     10: "5%",  # Gold
     11: "10%"  # Silver
 }
@@ -104,62 +113,68 @@ def printResult(bands, img, resPos, DEBUG):
         8: "1 ppm/K"
     }
 
-    color_codes = []
-    for x, (color_name, _) in bands:
-        # Assuming 'color_names' is a reverse dictionary from the color name to its index
-        color_codes.append(COLOUR_BOUNDS[color_name][3])  # Get the index/code from color name
+    # Dictionary to convert color names to their respective codes
+    color_code_dict = {name: code for (_, _, name, code, _) in COLOUR_BOUNDS}
 
-    # Definitions for display and calculations
-    display_message = "Insufficient data to calculate resistance."
-    detected_colors = [f"{name} at {x}" for x, (name, _) in bands]
+    # Sort the bands by their x-coordinate and convert to a list
+    sorted_bands = sorted(bands.items(), key=lambda item: item[0])
 
-    if len(color_codes) >= 3:
-        try:
-            if len(color_codes) == 3:
-                base_value = int(str(color_codes[0]) + str(color_codes[1]))
-                multiplier = 10 ** color_codes[2]
-            elif len(color_codes) == 4:
-                base_value = int(str(color_codes[0]) + str(color_codes[1]))
-                multiplier = 10 ** color_codes[2]
-                tolerance = tolerance_codes.get(color_codes[3], "Unknown")
-            elif len(color_codes) == 5:
-                base_value = int(str(color_codes[0]) + str(color_codes[1]) + str(color_codes[2]))
-                multiplier = 10 ** color_codes[3]
-                tolerance = tolerance_codes.get(color_codes[4], "Unknown")
-            elif len(color_codes) == 6:
-                base_value = int(str(color_codes[0]) + str(color_codes[1]) + str(color_codes[2]))
-                multiplier = 10 ** color_codes[3]
-                tolerance = tolerance_codes.get(color_codes[4], "Unknown")
-                temperature = temperature_list.get(color_codes[5], "Unknown")
+    print("Sorted bands:", sorted_bands)
+
+    resistance = ""
+    tolerance = ""
+    temperature = ""
+
+    if not sorted_bands:
+        print("Error: No bands detected.")
+        return
+
+    try:
+    # Convert color names to resistor codes
+        band_codes = [color_code_dict[band[1][0]] for band in sorted_bands]
+
+        # Determine the base value and multiplier based on the number of bands
+        if len(band_codes) >= 3:
+            if len(band_codes) == 3:
+                base_value = int(f"{band_codes[0]}{band_codes[1]}")
+                multiplier = 10 ** band_codes[2]
+            elif len(band_codes) == 4:
+                base_value = int(f"{band_codes[0]}{band_codes[1]}")
+                multiplier = 10 ** band_codes[2]
+                tolerance = tolerance_codes.get(band_codes[3], "Unknown tolerance")
+            elif len(band_codes) == 5:
+                base_value = int(f"{band_codes[0]}{band_codes[1]}{band_codes[2]}")
+                multiplier = 10 ** band_codes[3]
+                tolerance = tolerance_codes.get(band_codes[4], "Unknown tolerance")
+            elif len(band_codes) == 6:
+                base_value = int(f"{band_codes[0]}{band_codes[1]}{band_codes[2]}")
+                multiplier = 10 ** band_codes[3]
+                tolerance = tolerance_codes.get(band_codes[4], "Unknown tolerance")
+                temperature = temperature_list.get(band_codes[5], "Unknown temperature coefficient")
 
             final_resistance = base_value * multiplier
-            display_message = f"{final_resistance} OHMS"
-            print(f"Resistor Value: {final_resistance} Ohms")
-            if tolerance:
-                print(f"Tolerance: {tolerance}")
-            if temperature:
-                print(f"Temperature: {temperature}")
-        except Exception as e:
-            print(f"Error calculating resistance: {e}")
+            resistance = f"{final_resistance} Ohms"  # Formatting resistance with units
 
-    # Display results on image
-    x, y, w, h = resPos
-    cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
-    cv2.putText(img, display_message, (x + w + 10, y), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
+    except Exception as e:
+        print(f"Error processing bands: {e}")
+        return
 
-    # Optionally display all detected colors
-    text_y = y + 20
-    for color_text in detected_colors:
-        cv2.putText(img, color_text, (x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
-        text_y += 20
+
+    # Draw the resistor and the text
+    cv2.rectangle(img, (resPos[0], resPos[1]), (resPos[0] + resPos[2], resPos[1] + resPos[3]), (0, 255, 0), 2)
+    cv2.putText(img, f"Resistance: {resistance}", (resPos[0], resPos[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+    cv2.putText(img, f"Tolerance: {tolerance}", (resPos[0], resPos[1] - 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+    cv2.putText(img, f"Temperature: {temperature}", (resPos[0], resPos[1] - 50), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
     if DEBUG:
-        cv2.imshow("Final Result", img)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+        print(f"Resistance: {resistance}")
+        print(f"Tolerance: {tolerance}")
+        print(f"Temperature: {temperature}")
+
+
 
     
-def findBands(median_img, DEBUG=False):
+def findBands(median_img, DEBUG=True):
     resized_img = cv2.resize(median_img, (400, 200))  # Resize image for processing
     hsv = cv2.cvtColor(resized_img, cv2.COLOR_BGR2HSV)
     bands = {}
@@ -176,6 +191,10 @@ def findBands(median_img, DEBUG=False):
 
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
+        # show each color mask
+        if DEBUG:
+            cv2.imshow(color_name, mask)
+            
         # Process each contour
         for contour in contours:
             if validContour(contour):
@@ -192,7 +211,6 @@ def findBands(median_img, DEBUG=False):
 
     if DEBUG:
         cv2.imshow('Processed Bands', resized_img)  # Optional: Display the image with drawn contours
-        cv2.waitKey(0)
 
     return bands
 
@@ -200,8 +218,6 @@ def findBands(median_img, DEBUG=False):
 def display_images(images, titles):
     for img, title in zip(images, titles):
         cv2.imshow(title, img)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
 
 def main(image_path):
     img, resistors = load_and_detect_resistors(image_path)
@@ -226,6 +242,9 @@ def main(image_path):
 
         printResult(bands, img, (x, y, w, h), DEBUG=True)
         display_images([cropped_img, preprocessed_img, median_img], ['Cropped', 'Preprocessed', 'Median'])
+    
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
 
 main('pic4.jpg')
 
