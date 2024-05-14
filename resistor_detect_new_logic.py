@@ -172,14 +172,13 @@ def printResult(bands, img, resPos, DEBUG):
         print(f"Temperature: {temperature}")
 
 
-
     
 def findBands(median_img, DEBUG=True):
     resized_img = cv2.resize(median_img, (400, 200))  # Resize image for processing
     hsv = cv2.cvtColor(resized_img, cv2.COLOR_BGR2HSV)
     bands = {}
     last_pos = -30  # Initialize last accepted position
-
+  
     # Iterate over the defined color bounds to create masks and find contours
     for bounds in COLOUR_BOUNDS:
         lower_bound, upper_bound, color_name, _, _ = bounds
@@ -247,5 +246,3 @@ def main(image_path):
     cv2.destroyAllWindows()
 
 main('pic4.jpg')
-
-
