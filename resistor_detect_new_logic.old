@@ -86,7 +86,20 @@ def validContour(cnt):
 
 def printResult(bands, img, resPos, DEBUG):
     # Definitions for color and temperature properties
-    results = { }
+    color_names = {
+        0: "BLACK",
+        1: "BROWN",
+        2: "RED",
+        3: "ORANGE",
+        4: "YELLOW",
+        5: "GREEN",
+        6: "BLUE",
+        7: "PURPLE",
+        8: "GRAY",
+        9: "WHITE",
+        10: "GOLD",
+        11: "SILVER"
+    }
 
     temperature_list = {
         0: "250 ppm/K",
