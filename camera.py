@@ -7,11 +7,7 @@ camera_config = picam2.create_still_configuration(main={"size": (1920, 1080)}, l
 picam2.configure(camera_config)
 picam2.start_preview(Preview.QTGL)
 picam2.start()
-num = 0
 
-print("start")
-while True:
-    num+=1
-    keyboard.wait('esc')
-    name = "pic" + str(num)
-    picam2.capture_file(name+".jpg")
+def take_picture():
+    picam2.capture("pic.jpg")
+    print("Picture taken")
