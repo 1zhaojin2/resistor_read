@@ -206,7 +206,6 @@ def findBands(median_img, DEBUG=True):
 
     return bands
 
-
 def display_images(images, titles):
     for img, title in zip(images, titles):
         cv2.imshow(title, img)

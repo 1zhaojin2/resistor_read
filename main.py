@@ -3,9 +3,11 @@ import numpy as np
 from resistor_detect_new_logic import load_and_detect_resistors, crop_resistor, preprocess_image, compute_vertical_medians, findBands, printResult
 from camera import take_picture
 from motors import setup, rotate_servo, destroy
+from solenoid import useSolenoid
 import RPi.GPIO as GPIO
+from time import sleep
 
-button = 17
+button = 23
 
 setup()
 GPIO.setup(button, GPIO.IN, pull_up_down=GPIO.PUD_UP)
@@ -39,24 +41,29 @@ def main(image_path):
     # if the resistance is between 0 and 1000 ohms, rotate the servo once
     if results[0] < 1000:
         rotate_servo()
+        useSolenoid()
     elif results[0] < 10000:
         rotate_servo()
         rotate_servo()
+        useSolenoid()
     elif results[0] < 100000:
         rotate_servo()
         rotate_servo()
         rotate_servo()
+        useSolenoid()
     elif results[0] < 1000000:
         rotate_servo()
         rotate_servo()
         rotate_servo()
         rotate_servo()
+        useSolenoid()
     elif results[0] < 10000000:
         rotate_servo()
         rotate_servo()
         rotate_servo()
         rotate_servo()
         rotate_servo()
+        useSolenoid() 
 
 
 
@@ -68,15 +75,17 @@ def main(image_path):
 
 main('pic4.jpg')
 
-while(True):
-    # check if button is pushed
-    while GPIO.input(button) == GPIO.HIGH:
-        pass
-    
-    rotate_servo()
-    take_picture()
-    main('pic.jpg')
-
+try:
+    while(True):
+        # check if button is pushed
+        while GPIO.input(button) == GPIO.HIGH:
+            pass
+        
+        rotate_servo()
+        take_picture()
+        main('pic.jpg')
+except KeyboardInterrupt:
+    destroy()
 
 
 

@@ -11,13 +11,18 @@ GPIO.setmode(GPIO.BCM)
 #This sets up the GPIO 18 pin as an output pin
 GPIO.setup(25, GPIO.OUT)
 
-while (True):    
+# while (True):    
     
-    #This Turns Relay Off. Brings Voltage to Max GPIO can output ~3.3V
-    GPIO.output(25, 1)
-    #Wait 1 Seconds
-    sleep(1)
-    #Turns Relay On. Brings Voltage to Min GPIO can output ~0V.
-    GPIO.output(25, 0)
-    #Wait 1 Seconds
-    sleep(1)
+#     #This Turns Relay Off. Brings Voltage to Max GPIO can output ~3.3V
+#     GPIO.output(25, 1)
+#     #Wait 1 Seconds
+#     sleep(1)
+#     #Turns Relay On. Brings Voltage to Min GPIO can output ~0V.
+#     GPIO.output(25, 0)
+#     #Wait 1 Seconds
+#     sleep(1)
+
+def useSolenoid():
+    GPIO.output(25,1)
+    sleep(0.5)
+    GPIO.output(25,0)
