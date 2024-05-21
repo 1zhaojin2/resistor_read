@@ -18,7 +18,7 @@ def rotate_servo():
     try: 
         duty_cycle = 7.5 + (60 / 18)
         pwm.ChangeDutyCycle(duty_cycle) 
-        time.sleep(1)
+        time.sleep(0.5) # rotate one section (1s turns it twice)
         
     finally: 
         pwm.stop() 
