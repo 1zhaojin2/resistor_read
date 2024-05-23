@@ -1,5 +1,10 @@
 import cv2
 import numpy as np
+import cv2
+import numpy as np
+import RPi.GPIO as GPIO
+from time import sleep
+from picamera2 import Picamera2, Preview
 
 # Constants for red color bounds
 RED_TOP_LOWER = (160, 30, 80)
@@ -20,6 +25,7 @@ COLOUR_BOUNDS = [
     [(19, 120, 80), (23, 255, 255), "GOLD", 10, (0, 215, 255)],
     [(0, 0, 0), (0, 0, 50), "SILVER", 11, (192, 192, 192)]
 ]
+
 tolerance_codes = {
     1: "±1%",  # Brown
     2: "±2%",  # Red
@@ -33,6 +39,43 @@ tolerance_codes = {
     10: "5%",  # Gold
     11: "10%"  # Silver
 }
+
+GPIO.setwarnings(False)
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(25, GPIO.OUT) # Solenoid
+GPIO.setup(18, GPIO.OUT)
+
+def useSolenoid():
+    GPIO.output(25, 1)
+    sleep(0.5)
+    GPIO.output(25, 0)
+
+
+def rotate_servo():
+    try:
+        pwm = GPIO.PWM(18, 50)
+        pwm.start(0) 
+        # Set duty cycle for counterclockwise rotation
+        pwm.ChangeDutyCycle(5.7)  # Adjust this value if needed for your servo
+        sleep(0.5)
+    finally:
+        pwm.stop()
+
+def destroy():
+    GPIO.cleanup()
+
+picam2 = Picamera2()
+camera_config = picam2.create_still_configuration(main={"size": (1920, 1080)}, lores={"size": (854, 480)}, display="lores")
+picam2.configure(camera_config)
+picam2.start_preview(Preview.QTGL)
+picam2.start()
+
+def take_picture():
+    picam2.capture("pic.jpg")
+    print("Picture taken")
+
+button_pin = 24
+GPIO.setup(button_pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
 def load_and_detect_resistors(image_path):
     img = cv2.imread(image_path)
@@ -209,3 +252,75 @@ def findBands(median_img, DEBUG=True):
 def display_images(images, titles):
     for img, title in zip(images, titles):
         cv2.imshow(title, img)
+
+def main(image_path):
+    results = []
+    DEBUG = True
+    img, resistors = load_and_detect_resistors(image_path)
+    if img is None or resistors is None:
+        print("No resistors detected.")
+        return
+
+    for x, y, w, h in resistors:
+        cropped_img = crop_resistor(img, x, y, w, h)
+        preprocessed_img = preprocess_image(cropped_img)
+        median_img = compute_vertical_medians(preprocessed_img)
+        bands = findBands(median_img, DEBUG=True)
+        # print("Detected bands:", bands)
+
+        # Check the structure of color_code_positions, excluding 'last_pos'
+        for key, value in bands.items():
+            if key == 'last_pos':
+                continue
+            if not isinstance(value, (list, tuple)) or len(value) < 2:
+                print(f"Error: Value for {key} is not a list or tuple with at least two elements.")
+                return
+
+        results = printResult(bands, img, (x, y, w, h), DEBUG)
+    
+    
+    # if the resistance is between 0 and 1000 ohms, rotate the servo once
+    if results[0] < 1000:
+        rotate_servo()
+        useSolenoid()
+    elif results[0] < 10000:
+        rotate_servo()
+        rotate_servo()
+        useSolenoid()
+    elif results[0] < 100000:
+        rotate_servo()
+        rotate_servo()
+        rotate_servo()
+        useSolenoid()
+    elif results[0] < 1000000:
+        rotate_servo()
+        rotate_servo()
+        rotate_servo()
+        rotate_servo()
+        useSolenoid()
+    elif results[0] < 10000000:
+        rotate_servo()
+        rotate_servo()
+        rotate_servo()
+        rotate_servo()
+        rotate_servo()
+        useSolenoid() 
+
+    if DEBUG:
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
+
+
+try:
+    while(True):
+        # check if button is pushed
+        while GPIO.input(button_pin) == GPIO.HIGH:
+            print("Waiting for button press")
+            pass
+        print("Button pressed")
+        # rotate_servo()
+        # take_picture()
+        # main('pic.jpg')
+except KeyboardInterrupt:
+    destroy()
