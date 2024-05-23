@@ -226,6 +226,8 @@ def main(image_path):
 
     for x, y, w, h in resistors:
         cropped_img = crop_resistor(img, x, y, w, h)
+        cv2.imshow('Cropped', cropped_img)
+        cv2.waitKey(0)
         preprocessed_img = preprocess_image(cropped_img)
         median_img = compute_vertical_medians(preprocessed_img)
         bands = findBands(median_img, DEBUG=True)
@@ -245,4 +247,4 @@ def main(image_path):
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
-main('pic4.jpg')
+main('pic.jpg')

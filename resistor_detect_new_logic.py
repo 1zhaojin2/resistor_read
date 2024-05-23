@@ -71,11 +71,11 @@ picam2.start_preview(Preview.QTGL)
 picam2.start()
 
 def take_picture():
-    picam2.capture("pic.jpg")
+    picam2.capture_file("pic1.jpg")
     print("Picture taken")
 
-button_pin = 24
-GPIO.setup(button_pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+button_pin = 23
+GPIO.setup(button_pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 
 def load_and_detect_resistors(image_path):
     img = cv2.imread(image_path)
@@ -315,12 +315,9 @@ def main(image_path):
 try:
     while(True):
         # check if button is pushed
-        while GPIO.input(button_pin) == GPIO.HIGH:
-            print("Waiting for button press")
-            pass
-        print("Button pressed")
-        # rotate_servo()
-        # take_picture()
-        # main('pic.jpg')
+        if GPIO.input(button_pin) == GPIO.HIGH:
+            print("Button pushed")
+            take_picture()
+            main('pic.jpg')
 except KeyboardInterrupt:
     destroy()

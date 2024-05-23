@@ -11,3 +11,6 @@ picam2.start()
 def take_picture():
     picam2.capture("pic.jpg")
     print("Picture taken")
+    
+keyboard.add_hotkey('space', take_picture)
+

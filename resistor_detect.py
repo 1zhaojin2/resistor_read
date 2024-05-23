@@ -236,7 +236,7 @@ def findBands(resistorInfo, DEBUG):
 # MAIN
 rectCascade = init(DEBUG)
 
-cliveimg = cv2.imread("pic4.jpg")
+cliveimg = cv2.imread("pic1.jpg")
 if cliveimg is None:
     print("Image not found. Please check the file path.")
 else:
