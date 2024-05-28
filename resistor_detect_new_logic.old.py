@@ -8,17 +8,17 @@ RED_TOP_UPPER = (179, 255, 200)
 # Define color bounds
 COLOUR_BOUNDS = [
     [(0, 0, 0), (179, 255, 40), "BLACK", 0, (255, 255, 0)],
-    [(0, 19, 55), (179, 190, 78), "BROWN", 1, (0, 255, 102)],
+    [(0, 19, 55), (179, 190, 90), "BROWN", 1, (0, 255, 102)],
     [(0, 187, 125), (39, 255, 255), "RED", 2, (128, 0, 128)],
-    [(6, 197, 87), (20, 255, 255), "ORANGE", 3, (0, 128, 255)],
+    [(8, 197, 141), (13, 241, 177), "ORANGE", 3, (0, 128, 255)],
     [(22, 103, 164), (35, 255, 255), "YELLOW", 4, (0, 255, 255)],
     [(30, 76, 89), (87, 255, 184), "GREEN", 5, (0, 255, 0)],
     [(113, 40, 82), (125, 255, 255), "BLUE", 6, (255, 0, 0)],
     [(130, 40, 100), (140, 250, 220), "PURPLE", 7, (255, 0, 127)],
     [(0, 0, 50), (179, 50, 80), "GRAY", 8, (128, 128, 128)],
     [(0, 0, 0), (0, 0, 0), "WHITE", 9, (255, 255, 255)],  # Ignored for now
-    [(19, 120, 80), (23, 255, 255), "GOLD", 10, (0, 215, 255)],
-    [(0, 0, 0), (0, 0, 50), "SILVER", 11, (192, 192, 192)]
+    [(0, 0, 80), (0, 0, 0), "GOLD", 10, (0, 215, 255)], # ignored
+    [(0, 0, 0), (0, 0, 0), "SILVER", 11, (192, 192, 192)] # ignored
 ]
 tolerance_codes = {
     1: "±1%",  # Brown
@@ -230,6 +230,8 @@ def main(image_path):
         cv2.waitKey(0)
         preprocessed_img = preprocess_image(cropped_img)
         median_img = compute_vertical_medians(preprocessed_img)
+        # save median_img
+        cv2.imwrite("median_img.jpg", median_img)
         bands = findBands(median_img, DEBUG=True)
         print("Detected bands:", bands)
 

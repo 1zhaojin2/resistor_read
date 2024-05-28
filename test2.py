@@ -54,4 +54,4 @@ def test_color_masks(image_path, cascade_path):
     cv2.destroyAllWindows()
 
 # Usage
-test_color_masks("pic1.jpg", "cascade/haarcascade_resistors_0.xml")
+test_color_masks("pic.jpg", "cascade/haarcascade_resistors_0.xml")

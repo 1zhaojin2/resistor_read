@@ -19,8 +19,8 @@ def show_region_and_all_matched_areas(event, x, y, flags, param):
         floodflags |= cv2.FLOODFILL_FIXED_RANGE | cv2.FLOODFILL_MASK_ONLY
 
         # Define the color range threshold for flood filling
-        loDiff = (50, 50, 50, 50)
-        upDiff = (50, 50, 50, 50)
+        loDiff = (30, 30, 30, 30)
+        upDiff = (30, 30, 30, 30)
 
         # Perform flood fill from point (x, y)
         cv2.floodFill(img_copy, mask, (x, y), 0, loDiff, upDiff, floodflags)
@@ -50,8 +50,8 @@ def show_region_and_all_matched_areas(event, x, y, flags, param):
             cv2.imshow("All Matched Areas", np.zeros_like(image))
 
         # Create a black image to display the text
-        stats_img = np.zeros((200, 400, 3), dtype=np.uint8)
-        y0, dy = 50, 30
+        stats_img = np.zeros((300, 400, 3), dtype=np.uint8)
+        y0, dy = 30, 30
         for i, line in enumerate(text.split('\n')):
             y = y0 + i * dy
             cv2.putText(stats_img, line, (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA)
