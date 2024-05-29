@@ -48,8 +48,8 @@ def load_and_detect_resistors(image_path):
     return img, filtered_resistors
 
 def crop_resistor(img, x, y, w, h):
-    start_x = x + 110
-    end_x = x + w - 110
+    start_x = x + 1
+    end_x = x + w - 1  
     start_y = max(y + h // 2, 0)
     end_y = min(start_y + 20, img.shape[0])
     return img[start_y:end_y, start_x:end_x]
@@ -249,4 +249,4 @@ def main(image_path):
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
-main('pic.jpg')
+main('pic1.jpg')

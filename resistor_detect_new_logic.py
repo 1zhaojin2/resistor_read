@@ -107,16 +107,6 @@ def compute_vertical_medians(cropped_img):
     median_img = np.tile(median_values, (20, 1, 1))
     return median_img
 
-def preprocess_image(cropped_img):
-    hsv_img = cv2.cvtColor(cropped_img, cv2.COLOR_BGR2HSV)
-    h, s, v = cv2.split(hsv_img)
-    h_filtered = cv2.bilateralFilter(h, 9, 75, 75)
-    s_filtered = cv2.bilateralFilter(s, 9, 75, 75)
-    v_filtered = cv2.bilateralFilter(v, 9, 75, 75)
-    v[v > 180] = 180  # Threshold highlights
-    filtered_hsv = cv2.merge([h_filtered, s_filtered, v_filtered])
-    return cv2.cvtColor(filtered_hsv, cv2.COLOR_HSV2BGR)
-
 def validContour(cnt):
     # Get the bounding rectangle of the contour
     x, y, w, h = cv2.boundingRect(cnt)
@@ -207,7 +197,15 @@ def printResult(bands, img, resPos, DEBUG):
 
     return results
 
-
+def preprocess_image(cropped_img):
+    hsv_img = cv2.cvtColor(cropped_img, cv2.COLOR_BGR2HSV)
+    h, s, v = cv2.split(hsv_img)
+    h_filtered = cv2.bilateralFilter(h, 9, 75, 75)
+    s_filtered = cv2.bilateralFilter(s, 9, 75, 75)
+    v_filtered = cv2.bilateralFilter(v, 9, 75, 75)
+    v[v > 180] = 180  # Threshold highlights
+    filtered_hsv = cv2.merge([h_filtered, s_filtered, v_filtered])
+    return cv2.cvtColor(filtered_hsv, cv2.COLOR_HSV2BGR)
     
 def findBands(median_img, DEBUG=True):
     resized_img = cv2.resize(median_img, (400, 200))  # Resize image for processing
