@@ -52,7 +52,7 @@ def crop_resistor(img, x, y, w, h):
     end_x = x + w - 1  
     start_y = max(y + h // 2, 0)
     end_y = min(start_y + 20, img.shape[0])
-    return img[start_y:end_y, start_x:end_x]
+    return img [start_y:end_y, start_x:end_x]
 
 def compute_vertical_medians(cropped_img):
     median_values = np.zeros((1, cropped_img.shape[1], 3), dtype=np.uint8)
