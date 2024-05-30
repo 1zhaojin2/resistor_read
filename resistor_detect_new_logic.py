@@ -17,9 +17,9 @@ RED_TOP_UPPER = (179, 255, 200)
 
 # Define color bounds
 COLOUR_BOUNDS = [
-    [(0, 0, 0), (179, 255, 40), "BLACK", 0, (255, 255, 0)],
-    [(0, 19, 55), (179, 190, 78), "BROWN", 1, (0, 255, 102)],
-    [(0, 187, 125), (39, 255, 255), "RED", 2, (128, 0, 128)],
+    [(0, 0, 0), (179, 255, 80), "BLACK", 0, (255, 255, 0)],
+    [(90, 0, 60), (179, 255, 110677), "BROWN", 1, (0, 255, 102)],
+    [(148, 95, 99), (177, 158, 125), "RED", 2, (128, 0, 128)],
     [(6, 197, 87), (20, 255, 255), "ORANGE", 3, (0, 128, 255)],
     [(22, 103, 164), (35, 255, 255), "YELLOW", 4, (0, 255, 255)],
     [(30, 76, 89), (87, 255, 184), "GREEN", 5, (0, 255, 0)],
@@ -123,7 +123,7 @@ def validContour(cnt):
     x, y, w, h = cv2.boundingRect(cnt)
     
     # Check if the width of the bounding rectangle is at least 10 pixels
-    if w < 10:
+    if w < 5:
         return False
     
     return True
@@ -307,6 +307,8 @@ def main(image_path):
                 useSolenoid()
     
     cv2.imwrite('final_result.jpg', img)
+
+    return
 
 try:
     while(True):
