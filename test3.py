@@ -58,7 +58,7 @@ def show_region_and_all_matched_areas(event, x, y, flags, param):
         cv2.imshow("Statistics", stats_img)
 
 # Load an image
-image = cv2.imread('Median.jpg')
+image = cv2.imread('median_resistor_0.jpg')
 # image = cv2.resize(image, (0,0), fx=0.3, fy=0.3)
 
 # Check if image is loaded properly

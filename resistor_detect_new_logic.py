@@ -25,9 +25,9 @@ COLOUR_BOUNDS = [
     [(30, 76, 89), (87, 255, 184), "GREEN", 5, (0, 255, 0)],
     [(113, 40, 82), (125, 255, 255), "BLUE", 6, (255, 0, 0)],
     [(130, 40, 100), (140, 250, 220), "PURPLE", 7, (255, 0, 127)],
-    [(0, 0, 50), (179, 50, 80), "GRAY", 8, (128, 128, 128)],
+    [(0, 0, 0), (0, 0, 0), "GRAY", 8, (128, 128, 128)],
     [(0, 0, 0), (0, 0, 0), "WHITE", 9, (255, 255, 255)],  # Ignored for now
-    [(19, 120, 80), (23, 255, 255), "GOLD", 10, (0, 215, 255)],
+    [(0, 0, 0), (0, 0, 0), "GOLD", 10, (0, 215, 255)],
     [(0, 0, 0), (0, 0, 50), "SILVER", 11, (192, 192, 192)]
 ]
 
@@ -102,8 +102,8 @@ def load_and_detect_resistors(image_path):
     return img, resistors
 
 def crop_resistor(img, x, y, w, h):
-    start_x = x + 110
-    end_x = x + w - 110
+    start_x = x + 50
+    end_x = x + w - 50
     start_y = max(y + h // 2, 0)
     end_y = min(start_y + 20, img.shape[0])
     return img[start_y:end_y, start_x:end_x]
@@ -276,7 +276,7 @@ def main(image_path):
         median_img = compute_vertical_medians(preprocessed_img)
         cv2.imwrite(f"median_resistor_{i}.jpg", median_img)
         bands = findBands(median_img, DEBUG=True)
-        results = printResult(bands, img, (x, y, w, h), DEBUG)
+        results = printResult(bands, img, (x, y, w, h), True)
 
         if results:
             resistance_value = int(results[0].split()[0])
