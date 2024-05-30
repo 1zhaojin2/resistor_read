@@ -5,18 +5,6 @@ from time import sleep
 from picamera2 import Picamera2, Preview
 from inference_sdk import InferenceHTTPClient
 
-'''
-QObject::moveToThread: Current thread (0x7f6000a810) is not the object's thread (0x7f6017faa0).
-Cannot move to target thread (0x7f6000a810)
-
-qt.qpa.plugin: Could not load the Qt platform plugin "xcb" in "/home/alex/.local/lib/python3.11/site-packages/cv2/qt/plugins" even though it was found.
-This application failed to start because no Qt platform plugin could be initialized. Reinstalling the application may fix this problem.
-
-Available platform plugins are: xcb, eglfs, linuxfb, minimal, minimalegl, offscreen, vnc, wayland-egl, wayland, wayland-xcomposite-egl, wayland-xcomposite-glx.
-
-Aborted
-'''
-
 # Initialize the Roboflow client
 CLIENT = InferenceHTTPClient(
     api_url="https://detect.roboflow.com",
@@ -170,7 +158,7 @@ def printResult(bands, img, resPos, DEBUG):
 
     if not sorted_bands:
         print("Error: No bands detected.")
-        return
+        return results
 
     try:
     # Convert color names to resistor codes
@@ -200,7 +188,7 @@ def printResult(bands, img, resPos, DEBUG):
 
     except Exception as e:
         print(f"Error processing bands: {e}")
-        return
+        return results
 
 
     # Draw the resistor and the text
@@ -275,8 +263,6 @@ def display_images(images, titles):
         cv2.imwrite(f"{title}.jpg", img)
 
 def main(image_path):
-    results = []
-    DEBUG = True
     img, resistors = load_and_detect_resistors(image_path)
     if img is None or resistors is None:
         print("No resistors detected.")
@@ -291,36 +277,36 @@ def main(image_path):
         cv2.imwrite(f"median_resistor_{i}.jpg", median_img)
         bands = findBands(median_img, DEBUG=True)
         results = printResult(bands, img, (x, y, w, h), DEBUG)
-    
-    # if the resistance is between 0 and 1000 ohms, rotate the servo once
-    if results and int(results[0].split()[0]) < 1000:
-        rotate_servo()
-        useSolenoid()
-    elif results and int(results[0].split()[0]) < 10000:
-        rotate_servo()
-        rotate_servo()
-        useSolenoid()
-    elif results and int(results[0].split()[0]) < 100000:
-        rotate_servo()
-        rotate_servo()
-        rotate_servo()
-        useSolenoid()
-    elif results and int(results[0].split()[0]) < 1000000:
-        rotate_servo()
-        rotate_servo()
-        rotate_servo()
-        rotate_servo()
-        useSolenoid()
-    elif results and int(results[0].split()[0]) < 10000000:
-        rotate_servo()
-        rotate_servo()
-        rotate_servo()
-        rotate_servo()
-        rotate_servo()
-        useSolenoid()
 
-    if DEBUG:
-        cv2.imwrite('final_result.jpg', img)
+        if results:
+            resistance_value = int(results[0].split()[0])
+            if resistance_value < 1000:
+                rotate_servo()
+                useSolenoid()
+            elif resistance_value < 10000:
+                rotate_servo()
+                rotate_servo()
+                useSolenoid()
+            elif resistance_value < 100000:
+                rotate_servo()
+                rotate_servo()
+                rotate_servo()
+                useSolenoid()
+            elif resistance_value < 1000000:
+                rotate_servo()
+                rotate_servo()
+                rotate_servo()
+                rotate_servo()
+                useSolenoid()
+            elif resistance_value < 10000000:
+                rotate_servo()
+                rotate_servo()
+                rotate_servo()
+                rotate_servo()
+                rotate_servo()
+                useSolenoid()
+    
+    cv2.imwrite('final_result.jpg', img)
 
 try:
     while(True):
