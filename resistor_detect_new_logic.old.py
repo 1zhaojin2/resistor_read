@@ -1,5 +1,12 @@
 import cv2
 import numpy as np
+from inference_sdk import InferenceHTTPClient
+
+# Initialize the Roboflow client
+CLIENT = InferenceHTTPClient(
+    api_url="https://detect.roboflow.com",
+    api_key="TR7fHlxhfPCLx6wzniIC"
+)
 
 # Constants for red color bounds
 RED_TOP_LOWER = (160, 30, 80)
@@ -7,8 +14,8 @@ RED_TOP_UPPER = (179, 255, 200)
 
 # Define color bounds
 COLOUR_BOUNDS = [
-    [(0, 0, 0), (179, 255, 40), "BLACK", 0, (255, 255, 0)],
-    [(0, 19, 55), (179, 190, 90), "BROWN", 1, (0, 255, 102)],
+    [(0, 0, 0), (105, 200, 106), "BLACK", 0, (255, 255, 0)],
+    [(0, 44, 70), (179, 80, 86), "BROWN", 1, (0, 255, 102)],
     [(0, 187, 125), (39, 255, 255), "RED", 2, (128, 0, 128)],
     [(8, 197, 141), (13, 241, 177), "ORANGE", 3, (0, 128, 255)],
     [(22, 103, 164), (35, 255, 255), "YELLOW", 4, (0, 255, 255)],
@@ -35,24 +42,31 @@ tolerance_codes = {
 }
 
 def load_and_detect_resistors(image_path):
+    # Perform inference with the Roboflow model
+    result = CLIENT.infer(image_path, model_id="detect-r/1")
+    predictions = result['predictions']
+    
     img = cv2.imread(image_path)
     if img is None:
         print("Error: Image not found")
         return None, None
-
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    cascade = cv2.CascadeClassifier('cascade/haarcascade_resistors_0.xml')
-    resistors = cascade.detectMultiScale(gray, scaleFactor=1.2, minNeighbors=7)
-
-    filtered_resistors = [r for r in resistors if r[2] >= 100 and r[3] >= 50]  # Filter by size
-    return img, filtered_resistors
+    
+    resistors = []
+    for prediction in predictions:
+        x = int(prediction['x'] - prediction['width'] / 2)
+        y = int(prediction['y'] - prediction['height'] / 2)
+        w = int(prediction['width'])
+        h = int(prediction['height'])
+        resistors.append((x, y, w, h))
+    
+    return img, resistors
 
 def crop_resistor(img, x, y, w, h):
     start_x = x + 1
     end_x = x + w - 1  
     start_y = max(y + h // 2, 0)
     end_y = min(start_y + 20, img.shape[0])
-    return img [start_y:end_y, start_x:end_x]
+    return img[start_y:end_y, start_x:end_x]
 
 def compute_vertical_medians(cropped_img):
     median_values = np.zeros((1, cropped_img.shape[1], 3), dtype=np.uint8)
@@ -192,13 +206,13 @@ def findBands(median_img, DEBUG=True):
 
         # show each color mask
         if DEBUG:
-            cv2.imshow(color_name, mask)
+            cv2.imwrite(f"mask_{color_name}.jpg", mask)
             
         # Process each contour
         for contour in contours:
             if validContour(contour):
                 if DEBUG:
-                    cv2.imshow('Contour', cv2.drawContours(resized_img, [contour], -1, (0, 255, 0), 2))
+                    cv2.imwrite(f'contour_{color_name}.jpg', cv2.drawContours(resized_img.copy(), [contour], -1, (0, 255, 0), 2))
                 M = cv2.moments(contour)
                 if M['m00'] != 0:
                     cx = int(M['m10'] / M['m00'])
@@ -209,14 +223,13 @@ def findBands(median_img, DEBUG=True):
                         last_pos = cx  # Update last accepted position
 
     if DEBUG:
-        cv2.imshow('Processed Bands', resized_img)  # Optional: Display the image with drawn contours
+        cv2.imwrite('processed_bands.jpg', resized_img)  # Optional: Save the image with drawn contours
 
     return bands
 
-
 def display_images(images, titles):
     for img, title in zip(images, titles):
-        cv2.imshow(title, img)
+        cv2.imwrite(f"{title}.jpg", img)
 
 def main(image_path):
     img, resistors = load_and_detect_resistors(image_path)
@@ -224,14 +237,13 @@ def main(image_path):
         print("No resistors detected.")
         return
 
-    for x, y, w, h in resistors:
+    for i, (x, y, w, h) in enumerate(resistors):
         cropped_img = crop_resistor(img, x, y, w, h)
-        cv2.imshow('Cropped', cropped_img)
-        cv2.waitKey(0)
+        cv2.imwrite(f"cropped_resistor_{i}.jpg", cropped_img)
         preprocessed_img = preprocess_image(cropped_img)
+        cv2.imwrite(f"preprocessed_resistor_{i}.jpg", preprocessed_img)
         median_img = compute_vertical_medians(preprocessed_img)
-        # save median_img
-        cv2.imwrite("median_img.jpg", median_img)
+        cv2.imwrite(f"median_resistor_{i}.jpg", median_img)
         bands = findBands(median_img, DEBUG=True)
         print("Detected bands:", bands)
 
@@ -246,7 +258,6 @@ def main(image_path):
         printResult(bands, img, (x, y, w, h), DEBUG=True)
         display_images([cropped_img, preprocessed_img, median_img], ['Cropped', 'Preprocessed', 'Median'])
     
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    cv2.imwrite('final_result.jpg', img)
 
 main('pic1.jpg')

@@ -1,10 +1,15 @@
 import cv2
 import numpy as np
-import cv2
-import numpy as np
 import RPi.GPIO as GPIO
 from time import sleep
 from picamera2 import Picamera2, Preview
+from inference_sdk import InferenceHTTPClient
+
+# Initialize the Roboflow client
+CLIENT = InferenceHTTPClient(
+    api_url="https://detect.roboflow.com",
+    api_key="TR7fHlxhfPCLx6wzniIC"
+)
 
 # Constants for red color bounds
 RED_TOP_LOWER = (160, 30, 80)
@@ -50,7 +55,6 @@ def useSolenoid():
     sleep(0.5)
     GPIO.output(25, 0)
 
-
 def rotate_servo():
     try:
         pwm = GPIO.PWM(18, 50)
@@ -78,17 +82,24 @@ button_pin = 23
 GPIO.setup(button_pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 
 def load_and_detect_resistors(image_path):
+    # Perform inference with the Roboflow model
+    result = CLIENT.infer(image_path, model_id="detect-r/1")
+    predictions = result['predictions']
+    
     img = cv2.imread(image_path)
     if img is None:
         print("Error: Image not found")
         return None, None
-
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    cascade = cv2.CascadeClassifier('cascade/haarcascade_resistors_0.xml')
-    resistors = cascade.detectMultiScale(gray, scaleFactor=1.2, minNeighbors=7)
-
-    filtered_resistors = [r for r in resistors if r[2] >= 100 and r[3] >= 50]  # Filter by size
-    return img, filtered_resistors
+    
+    resistors = []
+    for prediction in predictions:
+        x = int(prediction['x'] - prediction['width'] / 2)
+        y = int(prediction['y'] - prediction['height'] / 2)
+        w = int(prediction['width'])
+        h = int(prediction['height'])
+        resistors.append((x, y, w, h))
+    
+    return img, resistors
 
 def crop_resistor(img, x, y, w, h):
     start_x = x + 110
@@ -224,15 +235,15 @@ def findBands(median_img, DEBUG=True):
 
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-        # show each color mask
+        # Save each color mask as an image
         if DEBUG:
-            cv2.imshow(color_name, mask)
+            cv2.imwrite(f"mask_{color_name}.jpg", mask)
             
         # Process each contour
         for contour in contours:
             if validContour(contour):
                 if DEBUG:
-                    cv2.imshow('Contour', cv2.drawContours(resized_img, [contour], -1, (0, 255, 0), 2))
+                    cv2.imwrite('contour.jpg', cv2.drawContours(resized_img.copy(), [contour], -1, (0, 255, 0), 2))
                 M = cv2.moments(contour)
                 if M['m00'] != 0:
                     cx = int(M['m10'] / M['m00'])
@@ -243,13 +254,13 @@ def findBands(median_img, DEBUG=True):
                         last_pos = cx  # Update last accepted position
 
     if DEBUG:
-        cv2.imshow('Processed Bands', resized_img)  # Optional: Display the image with drawn contours
+        cv2.imwrite('processed_bands.jpg', resized_img)  # Optional: Save the image with drawn contours
 
     return bands
 
 def display_images(images, titles):
     for img, title in zip(images, titles):
-        cv2.imshow(title, img)
+        cv2.imwrite(f"{title}.jpg", img)
 
 def main(image_path):
     results = []
@@ -259,56 +270,45 @@ def main(image_path):
         print("No resistors detected.")
         return
 
-    for x, y, w, h in resistors:
+    for i, (x, y, w, h) in enumerate(resistors):
         cropped_img = crop_resistor(img, x, y, w, h)
+        cv2.imwrite(f"cropped_resistor_{i}.jpg", cropped_img)
         preprocessed_img = preprocess_image(cropped_img)
+        cv2.imwrite(f"preprocessed_resistor_{i}.jpg", preprocessed_img)
         median_img = compute_vertical_medians(preprocessed_img)
+        cv2.imwrite(f"median_resistor_{i}.jpg", median_img)
         bands = findBands(median_img, DEBUG=True)
-        # print("Detected bands:", bands)
-
-        # Check the structure of color_code_positions, excluding 'last_pos'
-        for key, value in bands.items():
-            if key == 'last_pos':
-                continue
-            if not isinstance(value, (list, tuple)) or len(value) < 2:
-                print(f"Error: Value for {key} is not a list or tuple with at least two elements.")
-                return
-
         results = printResult(bands, img, (x, y, w, h), DEBUG)
     
-    
     # if the resistance is between 0 and 1000 ohms, rotate the servo once
-    if results[0] < 1000:
+    if results and int(results[0].split()[0]) < 1000:
         rotate_servo()
         useSolenoid()
-    elif results[0] < 10000:
-        rotate_servo()
-        rotate_servo()
-        useSolenoid()
-    elif results[0] < 100000:
-        rotate_servo()
+    elif results and int(results[0].split()[0]) < 10000:
         rotate_servo()
         rotate_servo()
         useSolenoid()
-    elif results[0] < 1000000:
-        rotate_servo()
+    elif results and int(results[0].split()[0]) < 100000:
         rotate_servo()
         rotate_servo()
         rotate_servo()
         useSolenoid()
-    elif results[0] < 10000000:
+    elif results and int(results[0].split()[0]) < 1000000:
+        rotate_servo()
+        rotate_servo()
+        rotate_servo()
+        rotate_servo()
+        useSolenoid()
+    elif results and int(results[0].split()[0]) < 10000000:
         rotate_servo()
         rotate_servo()
         rotate_servo()
         rotate_servo()
         rotate_servo()
-        useSolenoid() 
+        useSolenoid()
 
     if DEBUG:
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
-
-
+        cv2.imwrite('final_result.jpg', img)
 
 try:
     while(True):
@@ -316,6 +316,6 @@ try:
         if GPIO.input(button_pin) == GPIO.HIGH:
             print("Button pushed")
             take_picture()
-            main('pic.jpg')
+            main('pic1.jpg')
 except KeyboardInterrupt:
     destroy()
