@@ -7,7 +7,7 @@ from sklearn.metrics import accuracy_score
 import os
 
 # Ensure the correct path to the CSV file
-csv_file_path = 'labels.csv'  # Update this if your file is in a different location
+csv_file_path = 'segmented_bands/labels.csv'  # Update this if your file is in a different location
 
 # Check if the file exists
 if not os.path.isfile(csv_file_path):
@@ -19,6 +19,8 @@ data = pd.read_csv(csv_file_path)
 # Function to extract features (average color)
 def extract_features(image_path):
     image = cv2.imread(image_path)
+    if image is None:
+        raise FileNotFoundError(f"Image not found at path: {image_path}")
     avg_color = np.mean(image, axis=(0, 1))
     return avg_color
 
@@ -28,6 +30,11 @@ labels = []
 for index, row in data.iterrows():
     image_path = row['image_path']
     color_name = row['color_name']
+    
+    # Correct the image path if necessary
+    if not os.path.isfile(image_path):
+        image_path = os.path.join('segmented_bands', os.path.basename(image_path))
+    
     avg_color = extract_features(image_path)
     features.append(avg_color)
     labels.append(color_name)
@@ -52,7 +59,7 @@ print(f'Accuracy: {accuracy * 100:.2f}%')
 
 # Save the model for future use
 import pickle
-with open('color_knn_model.pkl', 'wb') as f:
+with open('segmented_bands/color_knn_model.pkl', 'wb') as f:
     pickle.dump(knn, f)
 
-print("Model saved as color_knn_model.pkl")
+print("Model saved as segmented_bands/color_knn_model.pkl")

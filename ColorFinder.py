@@ -36,17 +36,11 @@ contours = sorted(contours, key=lambda c: cv2.boundingRect(c)[0])
 for idx, contour in enumerate(contours):
     x, y, w, h = cv2.boundingRect(contour)
     band = image[y:y+h, x:x+w]
-
-    # Crop out the left and right 3 pixels
-    if w > 6:  # Ensure the width is greater than 6 pixels
+    if w > 6: 
         band = band[:, 3:w-3]
-
-    # Save the band as an image file
     output_path = os.path.join(output_dir, f'band_{idx}.png')
     cv2.imwrite(output_path, band)
     print(f'Saved: {output_path}')
-
-    # Display the band (optional)
     cv2.imshow(f'Band - {idx}', band)
 
 cv2.waitKey(0)
