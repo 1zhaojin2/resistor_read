@@ -24,6 +24,6 @@ def predict_color(image_path):
     return prediction[0]
 
 # Example usage: predict the color of a new image
-new_image_path = 'segmented_bands/brown4.png'  # Update this path to your new image
+new_image_path = 'segmented_bands/orange9.png'  # Update this path to your new image
 predicted_color = predict_color(new_image_path)
 print(f'The predicted color for the image {new_image_path} is: {predicted_color}')
