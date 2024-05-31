@@ -1,60 +1,53 @@
-# Program to detect the resistor color band
-import numpy as np
 import cv2
+import numpy as np
+import os
 
-def ColorRanges(HSV_Color):
-    colorMap = {
-    	0  : 'black'       ,
-    	1  : 'brown'       ,
-        2  : 'red'         ,
-        3  : 'orange'      ,
-        4  : 'yellow'      ,
-        5  : 'green'       ,
-        6  : 'blue'        ,
-        7  : 'violet'      ,
-        8  : 'grey'        ,
-        9  : 'white'       ,
-        10 : 'red'         ,
-        12 : 'unidentified'
-    }
+# Create directory to save segmented bands
+output_dir = 'segmented_bands'
+if not os.path.exists(output_dir):
+    os.makedirs(output_dir)
 
-    # Bounderies definition
-    # Black, brown, red, orange, yellow, green, blue, violet, grey, gold, silver
-    boundaries = [
-    [  0, 00, 00], [179,255, 65], #black
-    [  8, 70, 51], [ 16,255,180], #brown
-    [125,178,100], [179,255,255], #red
-    [  3,102,108], [ 16,187,153], #orange
-    [ 24,127,178], [ 30,255,255], #yellow
-    [ 40, 30, 70], [ 74,255,255], #green
-    [ 91,127,127], [121,255,255], #blue
-    [129, 50,127], [170, 90,255], #violet
-    [  0,  0, 76], [179, 25,200], #grey
-    [  0,  0,204], [179, 25,255], #white
-    [  0,140,100], [  8,255,255]  #red
-    ]
+# Load the image
+image = cv2.imread('median_resistor_0.jpg')
 
-    # Default condition
-    color = 12
-    for i in range(0,len(boundaries),2):
-        LowerColor = np.array(boundaries[i],dtype='uint8')
-        HigherColor = np.array(boundaries[i+1],dtype='uint8')
-        Mask = cv2.inRange(HSV_Color,LowerColor,HigherColor)
-        #print 'Mask: ' + str(Mask) + ' MaskShape: ' + str(Mask.shape)
-        if Mask[0][0] == 255:
-            color = i//2
+# Convert image to HSV color space
+hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
-    return colorMap[color]
+# Define the background color range
+lower_background = np.array([30, 0, 100])
+upper_background = np.array([180, 255, 255])
 
-def GetColorFromBGR(BGR_Color):
-    ToConvert = BGR_Color.reshape(1,1,3)
-    hsv_conv = cv2.cvtColor(ToConvert,cv2.COLOR_BGR2HSV)
-    print ('Color: '+ str(hsv_conv))
-    Color = ColorRanges(hsv_conv)
-    return Color
+# Create a mask for the background
+background_mask = cv2.inRange(hsv_image, lower_background, upper_background)
 
-def GetRangesColors(BGR_array):
-    ColorRanges = []
-    for i in range(len(BGR_array)):
-        ColorRanges += [GetColorFromBGR(np.array(BGR_array[i],dtype='uint8'))]
-    return ColorRanges
+# Invert the mask to isolate the bands
+bands_mask = cv2.bitwise_not(background_mask)
+
+# Apply the mask to the image to isolate the bands
+isolated_bands = cv2.bitwise_and(image, image, mask=bands_mask)
+
+# Find contours of the bands
+contours, _ = cv2.findContours(bands_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+# Sort contours from left to right
+contours = sorted(contours, key=lambda c: cv2.boundingRect(c)[0])
+
+# Extract individual bands, crop, and save them
+for idx, contour in enumerate(contours):
+    x, y, w, h = cv2.boundingRect(contour)
+    band = image[y:y+h, x:x+w]
+
+    # Crop out the left and right 3 pixels
+    if w > 6:  # Ensure the width is greater than 6 pixels
+        band = band[:, 3:w-3]
+
+    # Save the band as an image file
+    output_path = os.path.join(output_dir, f'band_{idx}.png')
+    cv2.imwrite(output_path, band)
+    print(f'Saved: {output_path}')
+
+    # Display the band (optional)
+    cv2.imshow(f'Band - {idx}', band)
+
+cv2.waitKey(0)
+cv2.destroyAllWindows()
