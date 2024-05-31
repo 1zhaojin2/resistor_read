@@ -3,6 +3,7 @@ import numpy as np
 from time import sleep
 from inference_sdk import InferenceHTTPClient
 import pickle
+import os
 
 # Initialize the Roboflow client
 CLIENT = InferenceHTTPClient(
@@ -52,15 +53,24 @@ tolerance_codes = {
 }
 
 def load_and_detect_resistors(image_path):
+    # Check if image path exists
+    if not os.path.exists(image_path):
+        print(f"Error: Image path '{image_path}' does not exist")
+        return None, None
+
     # Perform inference with the Roboflow model
-    result = CLIENT.infer(image_path, model_id="detect-r/1")
-    predictions = result['predictions']
-    
+    try:
+        result = CLIENT.infer(image_path, model_id="detect-r/1")
+        predictions = result['predictions']
+    except Exception as e:
+        print(f"Error during inference: {e}")
+        return None, None
+
     img = cv2.imread(image_path)
     if img is None:
         print("Error: Image not found")
         return None, None
-    
+
     resistors = []
     for prediction in predictions:
         x = int(prediction['x'] - prediction['width'] / 2)
@@ -68,7 +78,7 @@ def load_and_detect_resistors(image_path):
         w = int(prediction['width'])
         h = int(prediction['height'])
         resistors.append((x, y, w, h))
-    
+
     return img, resistors
 
 def crop_resistor(img, x, y, w, h):
@@ -91,15 +101,15 @@ def compute_vertical_medians(cropped_img):
 def validContour(cnt):
     # Get the bounding rectangle of the contour
     x, y, w, h = cv2.boundingRect(cnt)
-    
+
     # Check if the width of the bounding rectangle is at least 10 pixels
     if w < 5:
         return False
-    
+
     return True
 
 def printResult(bands, img, resPos, DEBUG):
-    
+
     results = []
 
     temperature_list = {
@@ -116,6 +126,7 @@ def printResult(bands, img, resPos, DEBUG):
 
     # Dictionary to convert color names to their respective codes
     color_code_dict = {name: code for (_, _, name, code, _) in COLOUR_BOUNDS}
+    print("Color code dictionary:", color_code_dict)  # Debug print
 
     # Sort the bands by their x-coordinate and convert to a list
     sorted_bands = sorted(bands.items(), key=lambda item: item[0])
@@ -131,8 +142,9 @@ def printResult(bands, img, resPos, DEBUG):
         return results
 
     try:
-    # Convert color names to resistor codes
-        band_codes = [color_code_dict[band[1][0]] for band in sorted_bands]
+        # Convert color names to resistor codes
+        band_codes = [color_code_dict[band[1][0].upper()] for band in sorted_bands]  # Convert to uppercase
+        print("Band codes:", band_codes)  # Debug print
 
         # Determine the base value and multiplier based on the number of bands
         if len(band_codes) >= 3:
@@ -159,7 +171,6 @@ def printResult(bands, img, resPos, DEBUG):
     except Exception as e:
         print(f"Error processing bands: {e}")
         return results
-
 
     # Draw the resistor and the text
     cv2.rectangle(img, (resPos[0], resPos[1]), (resPos[0] + resPos[2], resPos[1] + resPos[3]), (0, 255, 0), 2)
@@ -188,7 +199,6 @@ def preprocess_image(cropped_img):
     filtered_hsv = cv2.merge([h_filtered, s_filtered, v_filtered])
     return cv2.cvtColor(filtered_hsv, cv2.COLOR_HSV2BGR)
 
-
 # Function to extract features (average color)
 def extract_features(image):
     if image is None:
@@ -202,7 +212,7 @@ def predict_color(image):
     avg_color = avg_color.reshape(1, -1)  # Reshape to match the model input
     prediction = knn_model.predict(avg_color)
     return prediction[0]
-    
+
 def findBands(median_img, DEBUG=True):
     hsv_image = cv2.cvtColor(median_img, cv2.COLOR_BGR2HSV)
     background_mask = cv2.inRange(hsv_image, lower_background, upper_background)
@@ -222,7 +232,6 @@ def findBands(median_img, DEBUG=True):
         if DEBUG:
             print(f"Band {i + 1}: {color_name}")
     return band_colors
-
 
 def display_images(images, titles):
     for img, title in zip(images, titles):
@@ -255,4 +264,5 @@ def main(image_path):
         printResult(bands, img, (x, y, w, h), DEBUG=True)
         display_images([cropped_img, preprocessed_img, median_img], ['Cropped', 'Preprocessed', 'Median'])
 
-main('pic1.jpg')
+if __name__ == "__main__":
+    main('pic1.jpg')

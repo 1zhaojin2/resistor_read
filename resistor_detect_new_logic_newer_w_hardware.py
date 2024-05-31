@@ -1,9 +1,48 @@
 import cv2
 import numpy as np
-import RPi.GPIO as GPIO
 from time import sleep
-from picamera2 import Picamera2, Preview
 from inference_sdk import InferenceHTTPClient
+import pickle
+import os
+import RPi.GPIO as GPIO
+from picamera2 import Picamera2, Preview
+
+GPIO.setwarnings(False)
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(25, GPIO.OUT) # Solenoid
+GPIO.setup(18, GPIO.OUT)
+
+def useSolenoid():
+    GPIO.output(25, 1)
+    sleep(0.5)
+    GPIO.output(25, 0)
+
+def rotate_servo():
+    try:
+        pwm = GPIO.PWM(18, 50)
+        pwm.start(0) 
+        # Set duty cycle for counterclockwise rotation
+        pwm.ChangeDutyCycle(5.7)  # Adjust this value if needed for your servo
+        sleep(1)
+    finally:
+        pwm.stop()
+
+def destroy():
+    GPIO.cleanup()
+
+picam2 = Picamera2()
+camera_config = picam2.create_still_configuration(main={"size": (1920, 1080)}, lores={"size": (854, 480)}, display="lores")
+picam2.configure(camera_config)
+picam2.start_preview(Preview.QTGL)
+picam2.start()
+
+def take_picture():
+    picam2.capture_file("pic1.jpg")
+    print("Picture taken")
+
+button_pin = 23
+GPIO.setup(button_pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+
 
 # Initialize the Roboflow client
 CLIENT = InferenceHTTPClient(
@@ -11,9 +50,16 @@ CLIENT = InferenceHTTPClient(
     api_key="TR7fHlxhfPCLx6wzniIC"
 )
 
+model_path = 'segmented_bands/color_knn_model.pkl'
+with open(model_path, 'rb') as f:
+    knn_model = pickle.load(f)
+
 # Constants for red color bounds
 RED_TOP_LOWER = (160, 30, 80)
 RED_TOP_UPPER = (179, 255, 200)
+
+lower_background = np.array([30, 0, 100])
+upper_background = np.array([160, 255, 255])
 
 # Define color bounds
 COLOUR_BOUNDS = [
@@ -45,52 +91,25 @@ tolerance_codes = {
     11: "10%"  # Silver
 }
 
-GPIO.setwarnings(False)
-GPIO.setmode(GPIO.BCM)
-GPIO.setup(25, GPIO.OUT) # Solenoid
-GPIO.setup(18, GPIO.OUT)
-
-def useSolenoid():
-    GPIO.output(25, 1)
-    sleep(0.5)
-    GPIO.output(25, 0)
-
-def rotate_servo():
-    try:
-        pwm = GPIO.PWM(18, 50)
-        pwm.start(0) 
-        # Set duty cycle for counterclockwise rotation
-        pwm.ChangeDutyCycle(5.7)  # Adjust this value if needed for your servo
-        sleep(0.5)
-    finally:
-        pwm.stop()
-
-def destroy():
-    GPIO.cleanup()
-
-picam2 = Picamera2()
-camera_config = picam2.create_still_configuration(main={"size": (1920, 1080)}, lores={"size": (854, 480)}, display="lores")
-picam2.configure(camera_config)
-picam2.start_preview(Preview.QTGL)
-picam2.start()
-
-def take_picture():
-    picam2.capture_file("pic1.jpg")
-    print("Picture taken")
-
-button_pin = 23
-GPIO.setup(button_pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
-
 def load_and_detect_resistors(image_path):
+    # Check if image path exists
+    if not os.path.exists(image_path):
+        print(f"Error: Image path '{image_path}' does not exist")
+        return None, None
+
     # Perform inference with the Roboflow model
-    result = CLIENT.infer(image_path, model_id="detect-r/1")
-    predictions = result['predictions']
-    
+    try:
+        result = CLIENT.infer(image_path, model_id="detect-r/1")
+        predictions = result['predictions']
+    except Exception as e:
+        print(f"Error during inference: {e}")
+        return None, None
+
     img = cv2.imread(image_path)
     if img is None:
         print("Error: Image not found")
         return None, None
-    
+
     resistors = []
     for prediction in predictions:
         x = int(prediction['x'] - prediction['width'] / 2)
@@ -98,7 +117,7 @@ def load_and_detect_resistors(image_path):
         w = int(prediction['width'])
         h = int(prediction['height'])
         resistors.append((x, y, w, h))
-    
+
     return img, resistors
 
 def crop_resistor(img, x, y, w, h):
@@ -121,15 +140,15 @@ def compute_vertical_medians(cropped_img):
 def validContour(cnt):
     # Get the bounding rectangle of the contour
     x, y, w, h = cv2.boundingRect(cnt)
-    
+
     # Check if the width of the bounding rectangle is at least 10 pixels
     if w < 5:
         return False
-    
+
     return True
 
 def printResult(bands, img, resPos, DEBUG):
-    
+
     results = []
 
     temperature_list = {
@@ -146,6 +165,7 @@ def printResult(bands, img, resPos, DEBUG):
 
     # Dictionary to convert color names to their respective codes
     color_code_dict = {name: code for (_, _, name, code, _) in COLOUR_BOUNDS}
+    print("Color code dictionary:", color_code_dict)  # Debug print
 
     # Sort the bands by their x-coordinate and convert to a list
     sorted_bands = sorted(bands.items(), key=lambda item: item[0])
@@ -161,8 +181,9 @@ def printResult(bands, img, resPos, DEBUG):
         return results
 
     try:
-    # Convert color names to resistor codes
-        band_codes = [color_code_dict[band[1][0]] for band in sorted_bands]
+        # Convert color names to resistor codes
+        band_codes = [color_code_dict[band[1][0].upper()] for band in sorted_bands]  # Convert to uppercase
+        print("Band codes:", band_codes)  # Debug print
 
         # Determine the base value and multiplier based on the number of bands
         if len(band_codes) >= 3:
@@ -190,7 +211,6 @@ def printResult(bands, img, resPos, DEBUG):
         print(f"Error processing bands: {e}")
         return results
 
-
     # Draw the resistor and the text
     cv2.rectangle(img, (resPos[0], resPos[1]), (resPos[0] + resPos[2], resPos[1] + resPos[3]), (0, 255, 0), 2)
     cv2.putText(img, f"Resistance: {resistance}", (resPos[0], resPos[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
@@ -217,5 +237,95 @@ def preprocess_image(cropped_img):
     v[v > 180] = 180  # Threshold highlights
     filtered_hsv = cv2.merge([h_filtered, s_filtered, v_filtered])
     return cv2.cvtColor(filtered_hsv, cv2.COLOR_HSV2BGR)
-    
 
+# Function to extract features (average color)
+def extract_features(image):
+    if image is None:
+        raise ValueError("Invalid image provided")
+    avg_color = np.mean(image, axis=(0, 1))
+    return avg_color
+
+# Predict the color of a new image
+def predict_color(image):
+    avg_color = extract_features(image)
+    avg_color = avg_color.reshape(1, -1)  # Reshape to match the model input
+    prediction = knn_model.predict(avg_color)
+    return prediction[0]
+
+def findBands(median_img, DEBUG=True):
+    hsv_image = cv2.cvtColor(median_img, cv2.COLOR_BGR2HSV)
+    background_mask = cv2.inRange(hsv_image, lower_background, upper_background)
+    bands_mask = cv2.bitwise_not(background_mask)
+    isolated_bands = cv2.bitwise_and(median_img, median_img, mask=bands_mask)
+    contours, _ = cv2.findContours(bands_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    valid_contours = [cnt for cnt in contours if validContour(cnt)]
+    band_colors = {}
+    for i, cnt in enumerate(valid_contours):
+        x, y, w, h = cv2.boundingRect(cnt)
+        band = median_img[y:y+h, x:x+w]
+        if w > 6:
+            band = band[:, 3:w-3]
+        avg_color = np.mean(band, axis=(0, 1))
+        color_name = predict_color(band)
+        band_colors[x] = (color_name, avg_color)
+        if DEBUG:
+            print(f"Band {i + 1}: {color_name}")
+    return band_colors
+
+def main(image_path):
+    img, resistors = load_and_detect_resistors(image_path)
+    if img is None or resistors is None:
+        print("No resistors detected.")
+        return
+
+    for i, (x, y, w, h) in enumerate(resistors):
+        cropped_img = crop_resistor(img, x, y, w, h)
+        cv2.imwrite(f"cropped_resistor_{i}.jpg", cropped_img)
+        preprocessed_img = preprocess_image(cropped_img)
+        cv2.imwrite(f"preprocessed_resistor_{i}.jpg", preprocessed_img)
+        median_img = compute_vertical_medians(preprocessed_img)
+        cv2.imwrite(f"median_resistor_{i}.jpg", median_img)
+        bands = findBands(median_img, DEBUG=True)
+        results = printResult(bands, img, (x, y, w, h), True)
+
+        if results:
+            resistance_value = int(results[0].split()[0])
+            if resistance_value < 1000:
+                rotate_servo()
+                useSolenoid()
+            elif resistance_value < 10000:
+                rotate_servo()
+                rotate_servo()
+                useSolenoid()
+            elif resistance_value < 100000:
+                rotate_servo()
+                rotate_servo()
+                rotate_servo()
+                useSolenoid()
+            elif resistance_value < 1000000:
+                rotate_servo()
+                rotate_servo()
+                rotate_servo()
+                rotate_servo()
+                useSolenoid()
+            elif resistance_value < 10000000:
+                rotate_servo()
+                rotate_servo()
+                rotate_servo()
+                rotate_servo()
+                rotate_servo()
+                useSolenoid()
+    
+    cv2.imwrite('final_result.jpg', img)
+
+    return
+
+try:
+    while(True):
+        # check if button is pushed
+        if GPIO.input(button_pin) == GPIO.HIGH:
+            print("Button pushed")
+            take_picture()
+            main('pic1.jpg')
+except KeyboardInterrupt:
+    destroy()
