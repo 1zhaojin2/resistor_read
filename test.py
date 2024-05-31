@@ -7,7 +7,7 @@ def nothing(x):
     pass
 
 # Load an image
-image_path = 'median_img.jpg'  # Update this to the path of your image
+image_path = 'median_resistor_0.jpg'  # Update this to the path of your image
 img = cv2.imread(image_path)
 if img is None:
     print("Error: Image not found.")

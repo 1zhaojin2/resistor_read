@@ -15,7 +15,7 @@ hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
 # Define the background color range
 lower_background = np.array([30, 0, 100])
-upper_background = np.array([180, 255, 255])
+upper_background = np.array([160, 255, 255])
 
 # Create a mask for the background
 background_mask = cv2.inRange(hsv_image, lower_background, upper_background)
